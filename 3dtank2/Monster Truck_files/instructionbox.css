@@ -1,0 +1,20 @@
+ #instructionbox
+ {
+  position: absolute;
+  padding: 12px;
+  left: 50%;
+  top: 50%;
+  background-color: #fff;
+  z-index: 10;
+  display:none;
+  text-align:center;
+  font: 10px/1.2;
+  color: #999;
+  font-family: 'Frijole', cursive;
+  opacity: 0.8;
+  border-radius: 10px;
+  padding: 28px;
+  width: 400px;
+ }
+h10 {font-size:28px;}
+h20 {font-size:20px;}

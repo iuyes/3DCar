@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+
+        <!-- Always force latest IE rendering engine (even in intranet) & Chrome Frame
+        Remove this if you use the .htaccess -->
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+        <title>testmy2</title>
+        <meta name="description" content="">
+        <meta name="author" content="yanhaijing">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <!-- Replace favicon.ico & apple-touch-icon.png in the root of your domain and delete these references -->
+        <link rel="shortcut icon" href="/favicon.ico">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+            }
+            .view-port {
+                height: 99.8%;
+                background: #000
+            }
+            #hud { text-align:right; font: 10px/1.2; font-family: 'Frijole', cursive; z-index:12; position:absolute; top:0; right:0; color:#fff; padding: 8px  }
+            #instructionbox {
+              position: absolute;
+              padding: 12px;
+              left: 50%;
+              top: 50%;
+              background-color: #fff;
+              z-index: 10;
+              display:none;
+              text-align:center;
+              font: 10px/1.2;
+              color: #999;
+              font-family: 'Frijole', cursive;
+              opacity: 0.8;
+              border-radius: 10px;
+              padding: 28px;
+              width: 400px;
+            }
+            h3 {font-size:28px;}
+            h20 {font-size:20px;}
+            #resultbox
+            {
+              position: absolute;
+              padding: 12px;
+              left: 50%;
+              top: 50%;
+              background-color: #fff;
+              z-index: 12;
+              display:none;
+              text-align:center;
+              font: 10px/1.2;
+              color: #999;
+              font-family: 'Frijole', cursive;
+              opacity: 0.8;
+              border-radius: 10px;
+              padding: 28px;
+              width: 300px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="hud">02:00<br><img src="img/star.png"> x 00<br><br><a href="javascript:toggleSound()"><img src="img/sound_on.png"></a></div>
+
+        <div id="resultbox"></div>
+        <div style="display: block; margin-left: -228px; margin-top: -174px;" id="instructionbox">
+            <h3>按任意键开始游戏！</h3>
+            <img src="img/arrowkeys.png">
+            <p>方向键控制驾驶</p>
+            <p>规定时间内收集尽可能多星星</p>
+        </div>
+
+        <div id="view-port" class="view-port">
+        </div>
+        
+        <!-- sand and dust shader --> 
+        <script type="x-shader/x-vertex" id="vertexshader">
+
+            uniform float speed;
+            attribute float time;
+            attribute vec3 customColor;
+            uniform float globalTime;
+            uniform sampler2D texture;
+            uniform int type;
+
+            varying vec3 vColor;
+            varying float fAlpha;
+
+            void main() {
+
+                vColor = customColor;
+
+                vec3 pos = position; 
+
+                float localTime = time + globalTime;
+                float modTime = mod( localTime, 1.0 );
+                float accTime = modTime * modTime;
+                
+                vec2 pulse = vec2( sin( pos.z ) * 10.0, abs( cos( accTime ) ) );
+                vec3 animated = vec3( (pos.x * accTime) + pulse.x, ( (pos.y * modTime) * pulse.y ) + abs(pulse.x) , pos.z * (accTime+0.3) );
+
+                vec4 mvPosition = modelViewMatrix * vec4( animated, 1.0 );
+
+                if (type == 0) {
+                    fAlpha = (1.25-modTime)*speed;
+                    gl_PointSize = 1.0+accTime;
+                } else {
+                    fAlpha = ((1.0-modTime)*speed)/10.0;
+                    gl_PointSize = 100.0;
+                }
+
+
+                gl_Position = projectionMatrix * mvPosition;
+
+            }
+
+        </script>
+
+        <script type="x-shader/x-fragment" id="fragmentshader">
+
+            uniform vec3 color;
+            uniform sampler2D texture;
+            uniform int type;
+
+            varying vec3 vColor;
+            varying float fAlpha;
+
+            void main() {
+
+                if (type == 0) {
+                    gl_FragColor = vec4(vColor, fAlpha);
+                } else {
+                    gl_FragColor = vec4( color * vColor, fAlpha );
+                    gl_FragColor = gl_FragColor * texture2D( texture, gl_PointCoord );
+                }
+
+            }
+
+        </script>
+        <script src="plugin/threejs/three-r62.js"></script>
+        <script type="text/javascript" src="js/mykeys.js"></script>
+        <script type="text/javascript" src="js/Collisions.js"></script>
+        <script type="text/javascript" src="js/CollisionUtils.js"></script>
+        <script type="text/javascript" src="js/Tween.js"></script>
+        <script src="js/snd.js"></script>
+        <script src="js/testmy2.js"></script>
+    </body>
+</html>

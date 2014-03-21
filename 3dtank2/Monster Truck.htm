@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+		<title>Monster Truck</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link rel="stylesheet" type="text/css" href="Monster%20Truck_files/style_no_stats.css">
+		<link href="Monster%20Truck_files/css.css" rel="stylesheet" type="text/css">
+		<link rel="stylesheet" type="text/css" href="Monster%20Truck_files/resultbox.css">
+		<link rel="stylesheet" type="text/css" href="Monster%20Truck_files/instructionbox.css">
+		<style type="text/css">
+			body { background:#000; }
+			#hud { text-align:right; font: 10px/1.2; font-family: 'Frijole', cursive; z-index:12; position:absolute; top:0; right:0; color:#fff; padding: 8px  }
+			#infobutton {
+				display: none;
+			}
+		</style>
+	</head>
+
+	<body>
+
+		<div id="infobutton">
+			<a href="javascript:toggleInfo()"><img src="Monster%20Truck_files/i.png" border="0"></a>
+		</div>
+		<div id="hud">01:25<br><img src="Monster%20Truck_files/star.png"> x 00<br><br><a href="javascript:toggleSound()"><img src="Monster%20Truck_files/sound_on.png"></a></div>
+		<div id="info">
+				<b>Monster Truck - WebGL(html5)</b><br>Arrowkeys to drive.
+				<p>A doodle that turned in to something of a simple game.<br>Was testing different stuff, like animating the particles, sand and dust in a shader.<br>The webkitAudioContext, for the engine sound, pitching it depending on speed<br>(use Chrome to hear that).<br>Rayshooting and facenormals. The webfonts for the HUD.<br><br>Not very optimized though, so not sure how it runs on the average hipsters macbook.<br>Guessing it needs a good GPU.. The one in my new workstation takes up 3 slots.. :P</p>
+				Done using <a href="https://github.com/mrdoob/three.js" target="_blank">three.js</a>.
+				<p><b>Note.</b> You need a modern browser that supports WebGL for this to run the way it is intended.<br>
+				For example. <a href="http://www.google.com/landing/chrome/" target="_blank">Google Chrome 9+</a> or <a href="http://www.mozilla.com/firefox/" target="_blank">Firefox 4+</a>.<br><br>(If you are already using one of those browsers and it's still not running, it's possible that you<br>have old blacklisted GPU drivers. Try updating the drivers for your graphic card.<br>Or try to set a '--ignore-gpu-blacklist' switch for the browser.)</p>
+				<font color="#777777">(C) OutsideOfSociety 2012.
+		</font></div><font color="#777777">
+
+		<div id="resultbox"></div>
+		<div style="display: block; margin-left: -228px; margin-top: -174px;" id="instructionbox"><p><h10>Press any key<br>to start!</h10><br><br></p><img src="Monster%20Truck_files/arrowkeys.png"><br>Use the arrowkeys to drive around.<br><br>Collect as many stars as possible<br>before the time is up.<p></p></div>
+
+		<script src="Monster%20Truck_files/Three.js"></script>
+
+		<script type="text/javascript" src="Monster%20Truck_files/keys.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/Collisions.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/CollisionUtils.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/Tween.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/snd.js"></script>
+
+		<script type="text/javascript" src="Monster%20Truck_files/RequestAnimationFrame.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/THREEx.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/info.js"></script>
+
+		<script type="text/javascript" src="Monster%20Truck_files/ShaderExtras.js"></script>
+
+		<script type="text/javascript" src="Monster%20Truck_files/EffectComposer.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/MaskPass.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/RenderPass.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/BloomPass.js"></script>
+		<script type="text/javascript" src="Monster%20Truck_files/ShaderPass.js"></script>
+
+		<!-- sand and dust shader --> 
+		<script type="x-shader/x-vertex" id="vertexshader">
+
+			uniform float speed;
+			attribute float time;
+			attribute vec3 customColor;
+			uniform float globalTime;
+			uniform sampler2D texture;
+			uniform int type;
+
+			varying vec3 vColor;
+			varying float fAlpha;
+
+			void main() {
+
+				vColor = customColor;
+
+				vec3 pos = position; 
+
+				float localTime = time + globalTime;
+				float modTime = mod( localTime, 1.0 );
+				float accTime = modTime * modTime;
+				
+				vec2 pulse = vec2( sin( pos.z ) * 10.0, abs( cos( accTime ) ) );
+				vec3 animated = vec3( (pos.x * accTime) + pulse.x, ( (pos.y * modTime) * pulse.y ) + abs(pulse.x) , pos.z * (accTime+0.3) );
+
+				vec4 mvPosition = modelViewMatrix * vec4( animated, 1.0 );
+
+				if (type == 0) {
+					fAlpha = (1.25-modTime)*speed;
+					gl_PointSize = 1.0+accTime;
+				} else {
+					fAlpha = ((1.0-modTime)*speed)/10.0;
+					gl_PointSize = 100.0;
+				}
+
+
+				gl_Position = projectionMatrix * mvPosition;
+
+			}
+
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+
+			uniform vec3 color;
+			uniform sampler2D texture;
+			uniform int type;
+
+			varying vec3 vColor;
+			varying float fAlpha;
+
+			void main() {
+
+				if (type == 0) {
+					gl_FragColor = vec4(vColor, fAlpha);
+				} else {
+					gl_FragColor = vec4( color * vColor, fAlpha );
+					gl_FragColor = gl_FragColor * texture2D( texture, gl_PointCoord );
+				}
+
+			}
+
+		</script>
+
+		<script>
+
+			var container;
+
+			var camera, scene, renderer;
+
+			var has_gl = false;
+
+			var delta;
+			var time;
+			var oldTime;
+			var startTime;
+			var lastTimeUpdate;
+			var starCount = 0;
+
+			var allLoaded = false;
+			var loadCount = 0;
+			var gameStarted = false;
+			var gameOver = false;
+			var canPressRestart = false;
+
+			var camx = 0;
+			var camy = 10000;
+			var camz = 300;
+
+			var car;
+			var carContainer;
+			var carMesh;
+			var ground;
+			var currentNormal = new THREE.Vector3(0,-1,0);
+			var tempNormal = new THREE.Vector3(0,-1,0);
+
+			var carx = 0;
+			var carz = 0;
+			var cary = 520;
+			var caryto = 520;
+
+			var light;
+			var sun;
+			var sky;
+			var star;
+			var starTaken = false;
+			var arrow;
+
+			var cubeMesh;
+			var groundArray = [];
+			var lastx = 0;
+			var lastz = 0;
+
+			var SHADOW_MAP_WIDTH = 1024, SHADOW_MAP_HEIGHT = 512;
+
+			var speed = 0;
+			var maxspeed = 30;
+			var angle = 0;
+			var friction = 0.08;
+			var steering = 0;
+			var hm = 0;
+			var vm = 0;
+
+			var ray = new THREE.Ray();
+			ray.direction = new THREE.Vector3(0, -1, 0);
+
+			var particlesFront;
+			var particlesBack;
+
+			var dustFront;
+			var dustBack;
+
+			var composer, effectFocus;
+
+			// sound
+			var engineBuffer = null;
+			var contextAudio;
+			var sourceNode;
+			var gainNode;
+			var soundOn = true;
+
+			showInstruction(allLoaded);
+
+			document.addEventListener( 'mousedown', onDocumentMousedown, false );
+
+			init();
+
+			function initSound() {
+				try {
+					contextAudio = new webkitAudioContext();
+					loadEngineSound("engine.zip");
+
+				}
+				catch(e) {
+					//console.log("No Web Audio API");
+				}
+			}
+
+			function loadEngineSound(url) {
+				var request = new XMLHttpRequest();
+				request.open('GET', url, true);
+				request.responseType = 'arraybuffer';
+
+				// decode
+				request.onload = function() {
+				contextAudio.decodeAudioData(request.response, function(buffer) {
+					engineBuffer = buffer;
+					playSound(engineBuffer);
+					}, onErrorSound);
+				}
+				request.send();
+			}
+
+			function playSound(buffer) {
+
+				sourceNode = contextAudio.createBufferSource();
+				sourceNode.buffer = buffer;
+				sourceNode.loop = true;
+
+				gainNode = contextAudio.createGainNode();
+				sourceNode.connect(gainNode);
+				gainNode.connect(contextAudio.destination);
+
+				sourceNode.noteOn(0);
+
+				sourceNode.playbackRate.value = 0.5;
+				gainNode.gain.value = 0.2;
+
+			}
+
+			function toggleSound () {
+				if (soundOn) {
+					soundOn = false;
+				} else {
+					soundOn = true;
+				}
+
+				updateCounter();
+			}
+
+			function onErrorSound (e) {
+				console.log(e);
+			}
+
+			function showResult() {
+				var resultbox = document.getElementById("resultbox");  
+				resultbox.innerHTML = "<h10>Game Over!</h10><BR><BR>";
+
+				var numStars = starCount;
+				if (numStars < 10) numStars = "0"+numStars;
+
+				resultbox.innerHTML += "<img src='Monster%20Truck_files/star.png' width='24' height='22'> x <h20>"+numStars+"</h20><BR><BR>Press any key to try again!";
+				resultbox.style.display = "block";	
+				resultbox.style.marginLeft = "-" + parseInt(resultbox.offsetWidth / 2) + "px";
+				resultbox.style.marginTop = "-" + parseInt(resultbox.offsetHeight / 2) + "px";
+				
+				gameOver = true;
+				canPressRestart = false;
+
+				setTimeout(setCanRestart, 1500);
+			}
+
+			function setCanRestart () {
+				canPressRestart = true;
+			}
+
+			function hideResult () {
+
+				var resultbox = document.getElementById("resultbox"); 
+				resultbox.style.display = "none";
+			}
+
+			function showInstruction(loadingComplete) {
+				var instructionbox = document.getElementById("instructionbox");  
+				if (loadingComplete) {
+					instructionbox.innerHTML = "<P><h10>按任意键开始游戏!</h10><BR><BR>";
+				} else {
+					instructionbox.innerHTML = "<P><h10>载入中...</h10><BR><BR>";
+				}
+				instructionbox.innerHTML += "<img src='Monster%20Truck_files/arrowkeys.png'><BR>方向键控制驾驶.<BR><BR>规定时间内<BR>收集尽可能多的星星</P>";
+				instructionbox.style.display = "block";	
+				instructionbox.style.marginLeft = "-" + parseInt(instructionbox.offsetWidth / 2) + "px";
+				instructionbox.style.marginTop = "-" + parseInt(instructionbox.offsetHeight / 2) + "px";
+			}
+
+			function hideInstruction () {
+				var instructionbox = document.getElementById("instructionbox"); 
+				instructionbox.style.display = "none";
+			}
+
+			function init() {
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				scene = new THREE.Scene();
+				scene.fog = new THREE.Fog( 0x5e8188, 6000, 8000 );
+				
+				car = new THREE.Object3D();
+				scene.add(car);
+
+				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100000 );
+				camera.position.z = camz;
+				camera.position.y = camy;
+
+				scene.add( camera );
+
+
+				// cube
+				var cubeGeometry = new THREE.CubeGeometry(10,10,10);
+				var cubeMaterial = new THREE.MeshLambertMaterial( {color: 0x00ff00, shading: THREE.FlatShading} );
+				cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterial);
+				cubeMesh.position.y = 500;
+				cubeMesh.visible = false;
+				scene.add(cubeMesh);
+
+				// terrain
+				var img = new Image();
+				img.onload = function () {
+					var data = getHeightData(img);
+
+					// plane
+					var planeGeometry = new THREE.PlaneGeometry( 5000, 5000, 63, 63 );
+					
+					var x = 0
+					var y = 0;
+					for ( var i = 0, l = planeGeometry.vertices.length; i < l; i++ ) {
+						if (i%65 == 64) ++y;
+						x = i-(y*64);
+						var dat = data[i];
+						planeGeometry.vertices[i].position.z = dat/4;
+					}
+
+					planeGeometry.computeCentroids();
+					planeGeometry.computeTangents();
+					planeGeometry.computeFaceNormals();
+					planeGeometry.computeVertexNormals();
+
+
+					for (var z=0; z<3; ++z ) {
+						groundArray[z] = [];
+						for (var x=0; x<3; ++x ) {
+							var texture = new THREE.Texture( createTexture() );
+							texture.needsUpdate = true;
+							texture.minFilter = THREE.NearestMipMapNearestFilter;
+							texture.magFilter = THREE.NearestMipMapNearestFilter;
+
+							var planeMaterial = new THREE.MeshLambertMaterial( {color: 0xffffff, map: texture, shading: THREE.SmoothShading} );
+
+							var ground = new THREE.Mesh(planeGeometry, planeMaterial);
+							ground.rotation.x = -Math.PI/2;
+							ground.position.x = ((x-1)*5000);
+							ground.position.z = ((z-1)*5000);
+
+							ground.castShadow = false;
+							ground.receiveShadow = true;
+							scene.add( ground );
+
+							groundArray[z].push(ground);
+
+							THREE.Collisions.colliders.push( THREE.CollisionUtils.MeshColliderWBox(ground) );
+						}
+					}
+
+				};
+
+				img.src = "hm.png";
+
+				// Lights
+				var ambient = new THREE.AmbientLight( 0x999999 );
+				scene.add( ambient );
+
+				var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.3 );
+				directionalLight.position.x = 0;
+				directionalLight.position.y = 0.1;
+				directionalLight.position.z = -1;
+				directionalLight.position.normalize();
+				scene.add( directionalLight );
+
+
+				light = new THREE.SpotLight( 0xaaaaaa );
+
+				light.castShadow = true;
+
+				light.shadowCameraNear = 1;
+				light.shadowCameraFar = camera.far;
+				light.shadowCameraFov = 40;
+
+				light.shadowBias = 0.00001;
+				light.shadowDarkness = 0.75;
+
+				light.shadowMapWidth = SHADOW_MAP_WIDTH;
+				light.shadowMapHeight = SHADOW_MAP_HEIGHT;
+
+				scene.add( light );
+
+				sun  = new THREE.Sprite( { map: THREE.ImageUtils.loadTexture( "sun.png") , useScreenCoordinates: false, color: 0xffffff, blending: THREE.AdditiveBlending } );
+				sun.scale.set( 9, 9, 9 );
+				scene.add(sun);
+
+
+				var skyMaterial = new THREE.MeshBasicMaterial( {color: 0xffffff, fog: false, map: THREE.ImageUtils.loadTexture( "sky.png"), shading: THREE.FlatShading} );
+				var skySphere = new THREE.SphereGeometry( 40000, 20, 10 );
+				sky = new THREE.Mesh(skySphere, skyMaterial);
+				sky.flipSided = true;
+				sky.position.y = 4000;
+				sky.scale.y = 0.10;
+				scene.add(sky);
+
+
+				// Models
+				var loader = new THREE.JSONLoader();
+
+				carContainer = new THREE.Object3D();
+				car.add(carContainer);
+				car.matrixAutoUpdate = false;
+
+				loader.load( "Monster%20Truck_files/monster.js", function( geometry ) {
+
+					var material = new THREE.MeshFaceMaterial();
+					carMesh = new THREE.Mesh( geometry, material );
+					carMesh.scale.set(0.5,0.5,0.5);
+					carMesh.position.y = 16;
+
+					carMesh.castShadow = true;
+					carMesh.receiveShadow = false;
+
+					carContainer.add( carMesh );
+					
+					checkLoaded();
+
+				} );
+
+				loader.load( "Monster%20Truck_files/wheel2.js", function( geometry ) {
+
+					var material = new THREE.MeshFaceMaterial();
+					frontleft = new THREE.Mesh( geometry, material );
+					frontleft.rotation.y = Math.PI/2;
+					frontleft.position.x = 34;
+					frontleft.position.z = 32;
+					frontleft.position.y = 20;
+
+					frontleft.castShadow = true;
+					frontleft.receiveShadow = false;
+
+					frontleft.doubleSided = true;
+
+					car.add( frontleft );
+
+					frontright = new THREE.Mesh( geometry, material );
+					frontright.rotation.y = -Math.PI/2;
+					frontright.position.x = -34;
+					frontright.position.z = 32;
+					frontright.position.y = 20;
+
+					frontright.castShadow = true;
+					frontright.receiveShadow = false;
+
+					frontright.doubleSided = true;
+
+					car.add( frontright );
+
+					backleft = new THREE.Mesh( geometry, material );
+					backleft.rotation.y = -Math.PI/2;
+					backleft.position.x = 34;
+					backleft.position.z = -29;
+					backleft.position.y = 20;
+
+					backleft.castShadow = true;
+					backleft.receiveShadow = false;
+
+					backleft.doubleSided = true;
+					
+					car.add( backleft );
+
+					backright = new THREE.Mesh( geometry, material );
+					backright.rotation.y = Math.PI/2;
+					backright.position.x = -34;
+					backright.position.z = -29;
+					backright.position.y = 20;
+
+					backright.castShadow = true;
+					backright.receiveShadow = false;
+
+					backright.doubleSided = true;
+
+					car.add( backright );
+
+					addParticles();
+					addDust();
+
+					checkLoaded();
+
+				} );
+
+				loader.load( "Monster%20Truck_files/star.js", function( geometry ) {
+
+					var material = new THREE.MeshBasicMaterial( {color: 0xffe073, shading: THREE.FlatShading} );
+					
+					star = new THREE.Mesh( geometry, material );
+					star.doubleSided = true;
+					star.scale.set(60,60,60);
+					star.position.x = 5000;
+
+					scene.add( star );
+
+					checkLoaded();
+
+				} );
+
+
+				loader.load( "Monster%20Truck_files/arrow.js", function( geometry ) {
+
+					var material = new THREE.MeshLambertMaterial( {color: 0xc83922, shading: THREE.SmoothShading} );
+					arrow = new THREE.Mesh( geometry, material );
+					arrow.rotation.z = -0.25;
+
+					scene.add( arrow );
+
+					checkLoaded();
+
+				} );
+
+				try {
+					// renderer
+					renderer = new THREE.WebGLRenderer({antialias: false});
+					renderer.setClearColorHex( 0x5e8188, 1 );
+					renderer.setSize( window.innerWidth, window.innerHeight );
+					THREEx.WindowResize(renderer, camera);
+				
+					renderer.shadowMapEnabled = true;
+					renderer.shadowMapSoft = true;
+					renderer.autoClear = false;
+
+					container.appendChild( renderer.domElement );
+					has_gl = true;
+
+					// postprocessing
+					var renderModel = new THREE.RenderPass( scene, camera );
+					var effectBloom = new THREE.BloomPass( 0.8 );
+					var effectScreen = new THREE.ShaderPass( THREE.ShaderExtras[ "screen" ] );
+					var effectFxaa = new THREE.ShaderPass( THREE.ShaderExtras[ "fxaa" ] );
+					effectFxaa.uniforms[ "resolution" ].value =  new THREE.Vector2( 1/window.innerWidth, 1/window.innerHeight );
+
+					effectScreen.renderToScreen = true;
+
+					composer = new THREE.EffectComposer( renderer );
+
+					composer.addPass( renderModel );
+					composer.addPass( effectBloom );
+					composer.addPass( effectFxaa );
+					composer.addPass( effectScreen );
+
+				}
+				catch (e) {
+					// need webgl
+					document.getElementById('info').innerHTML = "<P><BR><B>Note.</B> You need a modern browser that supports WebGL for this to run the way it is intended.<BR>For example. <a href='http://www.google.com/landing/chrome/beta/' target='_blank'>Google Chrome 9+</a> or <a href='http://www.mozilla.com/firefox/beta/' target='_blank'>Firefox 4+</a>.<BR><BR>If you are already using one of those browsers and still see this message, it's possible that you<BR>have old blacklisted GPU drivers. Try updating the drivers for your graphic card.<BR>Or try to set a '--ignore-gpu-blacklist' switch for the browser.</P><CENTER><BR><img src='../general/WebGL_logo.png' border='0'></CENTER>";
+					document.getElementById('info').style.display = "block";
+					return;
+				}
+
+			}
+
+			function checkLoaded () {
+				++loadCount;
+
+				if (loadCount >= 4) {
+					allLoaded = true;
+
+					setTimeout(loadingDone, 800);
+				}
+			}
+
+			function loadingDone () {
+				showInstruction(allLoaded);
+
+				document.addEventListener( 'keydown', keyD, false );
+				document.addEventListener( 'keyup', keyU, false );
+
+			}
+
+			function initGame () {
+				console.log("initGame");
+
+				gameStarted = true;
+				
+				startTime = new Date().getTime();
+
+				initSound();
+
+				animate();
+
+				setTimeout(setStar, 1000);
+
+				arrow.scale.set(0.01,0.01,0.01);
+				var tween = new TWEEN.Tween(arrow.scale)
+					.to({x: 2, y: 2, z: 2}, 500)
+					.delay(1500)
+					.easing(TWEEN.Easing.Linear.EaseNone);
+				tween.start();
+			}
+
+
+			function restartGame () {
+
+				hideResult();
+						
+				startTime = new Date().getTime();
+
+				setStar();
+
+				gameOver = false;
+
+				starCount = 0;
+	
+				updateCounter();
+			}
+
+			function updateCounter () {
+				if (time < lastTimeUpdate+1000) {
+					return;
+				}
+
+				var elapsedTime = time-startTime;
+				var endTime = 120*1000;
+
+				var countDown = endTime - elapsedTime;
+				var seconds = countDown/1000;
+				var minutes = Math.floor(seconds/60);
+				var outSeconds = Math.floor(seconds - (minutes*60));
+
+				if (minutes < 10) minutes = "0"+minutes;
+				if (outSeconds < 10) outSeconds = "0"+outSeconds;
+
+				if (countDown <= 0) {
+					minutes = "00";
+					outSeconds = "00";
+					console.log("time up");
+					
+					showResult();
+
+					speed = 0;
+					uniforms.speed.value = speed/maxspeed;
+					uniforms_dust.speed.value = speed/maxspeed;
+				}
+
+				lastTimeUpdate = time;
+
+				var numStars = starCount;
+				if (numStars < 10) numStars = "0"+numStars;
+
+				document.getElementById('hud').innerHTML = minutes+":"+outSeconds+"<BR><img src='Monster%20Truck_files/star.png'> x "+numStars;
+				if (soundOn) {
+					document.getElementById('hud').innerHTML += "<BR><BR><a href='javascript:toggleSound()'><img src='Monster%20Truck_files/sound_on.png'></a>";
+				} else {
+					document.getElementById('hud').innerHTML += "<BR><BR><a href='javascript:toggleSound()'><img src='Monster%20Truck_files/sound_off.png'></a>";				
+				}
+			}
+
+			function addParticles () {
+				// particles
+
+				attributes = {
+
+					customColor: { type: 'c', value: [] },
+					time: { type: 'f', value: [] },
+
+				};
+
+				uniforms = {
+
+					speed: { type: "f", value: 0.0 },
+					color:     { type: "c", value: new THREE.Color( 0xffffff ) },
+					texture:   { type: "t", value: 0, texture: null },
+					globalTime:		{ type: "f", value: 0.0 },
+					type:		{ type: "i", value: 0 },
+
+
+				};
+
+				var shaderMaterial = new THREE.ShaderMaterial( {
+
+					uniforms: 		uniforms,
+					attributes:     attributes,
+					vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+					fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+
+					blending: 		THREE.NormalBlending,
+					depthTest: 		true,
+					transparent:	true,
+					
+				});
+
+
+				var geometry = new THREE.Geometry();
+
+				for ( var i = 0; i < 3500; i++ ) {
+					var vector = new THREE.Vector3(-300, Math.random()*300, Math.random()*300 - 150);
+
+					geometry.vertices.push( new THREE.Vertex( vector ) );
+				}
+
+
+				var vertices = geometry.vertices;
+				var values_color = attributes.customColor.value;
+				var values_time = attributes.time.value;
+
+				for( var v = 0; v < vertices.length; v++ ) {
+					values_color[ v ] = new THREE.Color( 0x684d2a );
+					values_time[ v ] = Math.random();
+				}
+
+				particlesFront = new THREE.ParticleSystem( geometry, shaderMaterial );
+				particlesFront.rotation.y = -Math.PI/2;
+				particlesFront.position.y = 5;
+				particlesFront.position.z = 25;
+				car.add( particlesFront );
+
+				particlesBack = new THREE.ParticleSystem( geometry, shaderMaterial );
+				particlesBack.rotation.y = -Math.PI/2;
+				particlesBack.position.y = 5;
+				particlesBack.position.z = -35;
+				car.add( particlesBack );
+
+			}
+
+			function addDust () {
+				// particles
+				var map = THREE.ImageUtils.loadTexture( "dust2.png" );
+
+				attributes_dust = {
+
+					customColor: { type: 'c', value: [] },
+					time: { type: 'f', value: [] },
+
+				};
+
+				uniforms_dust = {
+
+					speed: { type: "f", value: 0.0 },
+					color:     { type: "c", value: new THREE.Color( 0xffffff ) },
+					texture:   { type: "t", value: 0, texture: map },
+					globalTime:		{ type: "f", value: 0.0 },
+					type:		{ type: "i", value: 1 },
+
+				};
+
+				var shaderMaterial = new THREE.ShaderMaterial( {
+
+					uniforms: 		uniforms_dust,
+					attributes:     attributes_dust,
+					vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+					fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+
+					blending: 		THREE.NormalBlending,
+					depthTest: 		false,
+					transparent:	true,
+					
+				});
+
+
+				var geometry = new THREE.Geometry();
+
+				for ( var i = 0; i < 25; i++ ) {
+					var vector = new THREE.Vector3(-300, Math.random()*300, Math.random()*300 - 150);
+
+					geometry.vertices.push( new THREE.Vertex( vector ) );
+				}
+
+
+				var vertices = geometry.vertices;
+				var values_color = attributes_dust.customColor.value;
+				var values_time = attributes_dust.time.value;
+
+				for( var v = 0; v < vertices.length; v++ ) {
+					values_color[ v ] = new THREE.Color( 0xbc9e77 );
+					values_time[ v ] = Math.random();
+				}
+
+
+				dustFront = new THREE.ParticleSystem( geometry, shaderMaterial );
+
+				dustFront.sortParticles = true;
+				dustFront.rotation.y = -Math.PI/2;
+				dustFront.position.y = 5;
+				dustFront.position.z = 25;
+				car.add( dustFront );
+
+
+				dustBack = new THREE.ParticleSystem( geometry, shaderMaterial );
+				dustBack.sortParticles = true;
+				dustBack.rotation.y = -Math.PI/2;
+				dustBack.position.y = 5;
+				dustBack.position.z = -35;
+
+				car.add( dustBack );
+
+			}
+
+			function updateTexture(texture, x, y, alpha) {
+				var contextTexture = texture.getContext( '2d' )
+
+				contextTexture.fillStyle = "rgba(189, 148, 95, "+alpha+")";
+				contextTexture.fillRect(x-1.5,y-1.5,3,3);
+			}
+
+			function clearTexture(texture) {
+				var contextTexture = texture.getContext( '2d' )
+
+				contextTexture.fillStyle = "rgb(222, 172, 109)";
+				contextTexture.fillRect(0, 0, 256, 256);
+			}
+
+			function createTexture() {
+
+				var texture = document.createElement( 'canvas' );
+				texture.width = 256;
+				texture.height = 256;
+				var contextTexture = texture.getContext( '2d' );
+				// bg
+				contextTexture.fillStyle = "rgb(222, 172, 109)";
+				contextTexture.fillRect(0, 0, 256, 256);
+
+				return texture;
+			}
+
+
+
+
+			function getHeightData(img) {
+				var canvas = document.createElement( 'canvas' );
+				canvas.width = 64;
+				canvas.height = 64;
+				var context = canvas.getContext( '2d' );
+
+				var size = 64 * 64, data = new Float32Array( size );
+
+				context.drawImage(img,0,0);
+
+				for ( var i = 0; i < size; i ++ ) {
+					data[i] = 0
+				}
+
+				var imgd = context.getImageData(0, 0, 64, 64);
+				var pix = imgd.data;
+
+				var j=0;
+				for (var i = 0, n = pix.length; i < n; i += (4)) {
+					var all = pix[i]+pix[i+1]+pix[i+2];
+					data[j++] = all*5;
+				}
+
+				return data;
+
+			}
+
+			function setStar () {
+				star.scale.set(40,40,40);
+
+				var rx = (Math.random()*3000)+3000;
+				var rz = (Math.random()*3000)+3000;
+				if (Math.random() < 0.5) rx *= -1; 
+				if (Math.random() < 0.5) rz *= -1; 
+
+				var x = carx + rx;
+				var z = carz + rz;
+
+				ray.origin.y = 10000;
+				ray.origin.x = x;
+				ray.origin.z = z;
+
+				var c = THREE.Collisions.rayCastNearest(ray);
+
+				if(c) {
+					var temp = ray.origin.clone().subSelf( new THREE.Vector3(0, c.distance, 0) );
+					star.position.x = x;
+					star.position.z = z;
+
+					star.position.y = temp.y-100;
+
+					var tween = new TWEEN.Tween(star.position)
+						.to({y: star.position.y+200}, 300)
+						.easing(TWEEN.Easing.Linear.EaseNone);
+					tween.start();
+
+					star.material.opacity = 1;
+
+				} else {
+					setStar();
+					//console.log("retry setStar");
+				}
+
+				starTaken = false;
+			}
+
+			function getStar () {
+				starTaken = true;
+	
+				playStaticSound(starSound,0.4);
+
+				++starCount;
+
+				var tween = new TWEEN.Tween(star.position)
+					.to({y: star.position.y+250}, 300)
+					.easing(TWEEN.Easing.Linear.EaseNone)
+					.onComplete(setStar);
+				tween.start();
+
+				var scaleTween = new TWEEN.Tween(star.scale)
+					.to({x: 70, y: 70, z: 70}, 300)
+					.easing(TWEEN.Easing.Linear.EaseNone);
+				scaleTween.start();
+
+				var rotTween = new TWEEN.Tween(star.rotation)
+					.to({y: star.rotation.y+12}, 300)
+					.easing(TWEEN.Easing.Linear.EaseNone);
+				rotTween.start();
+
+				var alphaTween = new TWEEN.Tween(star.material)
+					.to({opacity: 0.25}, 200)
+					.delay(20)
+					.easing(TWEEN.Easing.Linear.EaseNone);
+				alphaTween.start();			
+
+			}
+
+			function control(delta) {
+				var optimalDivider = delta/16;
+
+				var actualMaxspeed = maxspeed*optimalDivider;
+
+				steering = steering-(steering*0.1);
+				if (speed < 0) {
+					speed = 0;
+				}
+				// left
+				if (keyLeft) {
+					steering += 0.012*optimalDivider;
+				}
+				// right
+				if (keyRight) {
+					steering -= 0.012*optimalDivider;
+				}
+				// maxsteering
+				if (steering > 2) {
+					steering = 2;
+				}
+				if (steering < -2) {
+					steering = -2;
+				}
+				// accelerate
+				if (keyUp && speed < actualMaxspeed) {
+					speed += 0.5*optimalDivider;
+				} else {
+					speed = speed*0.95;
+					speed = speed*(1.0-(0.05*optimalDivider));
+				}
+				// brake
+				if (keyDown) {
+					speed = speed*0.93/optimalDivider;
+					if (speed < 0.1) {
+						speed = -8*optimalDivider;
+					}
+				}
+				// ideal change
+				var ideal_hm = speed*Math.sin(angle);
+				var ideal_vm = speed*Math.cos(angle);
+				// real change
+				hm += ((ideal_hm-hm)*friction);
+				vm += ((ideal_vm-vm)*friction);
+				// rotate according to speed
+				var actual_speed = Math.sqrt((hm*hm)+(vm*vm))/optimalDivider;
+
+				if (speed > 0) {
+					angle += (steering*actual_speed)*.020;
+				} else {				
+					angle -= (steering*actual_speed)*.020;
+				}
+				
+				// cube
+				cubeMesh.position.x = carx + Math.sin(angle)*100;
+				cubeMesh.position.z = carz + Math.cos(angle)*100;
+
+				frontleft.rotation.z -= speed/(60/optimalDivider);
+				frontright.rotation.z += speed/(60/optimalDivider);
+				backleft.rotation.z -= speed/(60/optimalDivider);
+				backright.rotation.z += speed/(60/optimalDivider);
+
+				frontleft.rotation.y = -Math.PI/2 + steering*5/optimalDivider;
+				frontright.rotation.y = Math.PI/2 + steering*5/optimalDivider;
+			
+				var tilt = (steering*actual_speed)*.075;
+				carContainer.rotation.z = tilt/optimalDivider;
+				if (tilt > 0) {
+					frontleft.position.y = 20+tilt*(30/optimalDivider);
+					backleft.position.y = 20+tilt*(30/optimalDivider);
+				} else {
+					frontright.position.y = 20+tilt*-(30/optimalDivider);
+					backright.position.y = 20+tilt*-(30/optimalDivider);					
+				}	
+
+				particlesFront.scale.y = Math.min(0.5, speed/actualMaxspeed);
+				particlesBack.scale.y = Math.min(0.5, speed/actualMaxspeed);
+
+				dustFront.scale.y = Math.min(0.75, speed/actualMaxspeed);
+				dustBack.scale.y = Math.min(0.75, speed/actualMaxspeed);
+
+				uniforms.speed.value = speed/actualMaxspeed;
+				uniforms_dust.speed.value = speed/actualMaxspeed;
+
+				particlesFront.rotation.y = -Math.PI/2 + steering*4;
+				particlesBack.rotation.y = -Math.PI/2 + steering*2;
+
+				// tiles
+				var checkx = carx + Math.sin(angle)*1200;
+				var checkz = carz + Math.cos(angle)*1200;
+				var wherex = Math.floor((checkx+2500)/5000);
+				var wherez = Math.floor((checkz+2500)/5000);
+
+				if (wherex > lastx) {
+					// move first col to last
+					for (var z=0; z<groundArray.length; ++z ) {
+						var ground = groundArray[z].shift();
+						ground.position.x += 15000;
+						ground.material.opacity = 0;
+						clearTexture(ground.material.map.image);
+						ground.material.map.needsUpdate = true;
+						var tween = new TWEEN.Tween(ground.material)
+							.to({opacity: 1}, 1500)
+							.easing(TWEEN.Easing.Cubic.EaseOut);
+						tween.start();
+						groundArray[z].push(ground);
+					}
+				}
+				if (wherex < lastx) {
+					// move last col to front
+					for (var z=0; z<groundArray.length; ++z ) {
+						var ground = groundArray[z].pop();
+						ground.position.x -= 15000;
+						ground.material.opacity = 0;
+						clearTexture(ground.material.map.image);
+						ground.material.map.needsUpdate = true;
+						var tween = new TWEEN.Tween(ground.material)
+							.to({opacity: 1}, 1500)
+							.easing(TWEEN.Easing.Cubic.EaseOut);
+						tween.start();
+						groundArray[z].unshift(ground);
+					}
+				}
+				if (wherez > lastz) {
+					// move last row to front
+					var lastrow = groundArray.shift();
+					for (var i=0; i<lastrow.length; ++i ) {
+						var ground = lastrow[i];
+						ground.material.opacity = 0;
+						clearTexture(ground.material.map.image);
+						ground.material.map.needsUpdate = true;
+						var tween = new TWEEN.Tween(ground.material)
+							.to({opacity: 1}, 1500)
+							.easing(TWEEN.Easing.Cubic.EaseOut);
+						tween.start();
+						ground.position.z += 15000;
+					}
+					groundArray.push(lastrow);
+				}
+				if (wherez < lastz) {
+					// move last row to back
+					var lastrow = groundArray.pop();
+					for (var i=0; i<lastrow.length; ++i ) {
+						var ground = lastrow[i];
+						ground.material.opacity = 0;
+						clearTexture(ground.material.map.image);
+						ground.material.map.needsUpdate = true;
+						var tween = new TWEEN.Tween(ground.material)
+							.to({opacity: 1}, 1500)
+							.easing(TWEEN.Easing.Cubic.EaseOut);
+						tween.start();
+						ground.position.z -= 15000;
+					}
+					groundArray.unshift(lastrow);
+				}
+
+
+				lastx = wherex;
+				lastz = wherez;
+
+				var divider = 1.1-(speed/30);
+
+				// first ray				
+				ray.origin.y = 10000;
+
+				ray.origin.x = cubeMesh.position.x;
+				ray.origin.z = cubeMesh.position.z;
+
+				var c = THREE.Collisions.rayCastNearest(ray);
+
+				if(c) {
+					var temp = ray.origin.clone().subSelf( new THREE.Vector3(0, c.distance, 0) );
+					cubeMesh.position.y += (temp.y - cubeMesh.position.y)/Math.max(3, 6*divider);
+
+				}
+				// second ray
+				ray.origin.x = carx+hm;
+				ray.origin.z = carz+vm;
+				ray.origin.y = 10000;
+
+				var c = THREE.Collisions.rayCastNearest(ray);
+				var onMesh;
+
+				if(c) {
+					var tempPos = ray.origin.clone().subSelf( new THREE.Vector3(0, c.distance, 0) );
+					caryto = tempPos.y;
+					tempNormal = groundArray[0][0].matrixRotationWorld.multiplyVector3( c.normal.clone() );
+					onMesh = c.mesh;
+				}
+
+				currentNormal.x += (tempNormal.x - currentNormal.x)/Math.max(2, 5*divider);
+				currentNormal.y += (tempNormal.y - currentNormal.y)/Math.max(2, 5*divider);
+				currentNormal.z += (tempNormal.z - currentNormal.z)/Math.max(2, 5*divider);
+
+
+				var zvec = new THREE.Vector3(cubeMesh.position.x, cubeMesh.position.y, cubeMesh.position.z);
+				zvec.subSelf( car.position ).normalize();
+
+				var xvec = new THREE.Vector3();
+				var yvec = new THREE.Vector3(currentNormal.x*-1, currentNormal.z*-1, currentNormal.y);
+
+				xvec.cross(zvec, yvec);
+				yvec.cross(zvec, xvec);
+	
+				car.matrixWorld.n11 = xvec.x; car.matrixWorld.n12 = yvec.x; car.matrixWorld.n13 = zvec.x; car.matrixWorld.n14 = carx;
+				car.matrixWorld.n21 = xvec.y; car.matrixWorld.n22 = yvec.y; car.matrixWorld.n23 = zvec.y; car.matrixWorld.n24 = cary;
+				car.matrixWorld.n31 = xvec.z; car.matrixWorld.n32 = yvec.z; car.matrixWorld.n33 = zvec.z; car.matrixWorld.n34 = carz;
+
+
+
+				carx += hm;
+				cary += (caryto - cary)/Math.max(2, 4*divider);
+				carz += vm;
+
+				car.position.x = carx;
+				car.position.y = cary;
+				car.position.z = carz;
+			
+				if (onMesh != undefined) {
+					
+					var px = Math.abs((onMesh.position.x - carx - 2500)) / 5000;
+					var py = Math.abs((onMesh.position.z - carz - 2500)) / 5000;
+					
+					var tx = Math.ceil(px * 256);
+					var ty = Math.ceil(py * 256);
+
+					var a = uniforms.speed.value*0.5 + Math.abs(steering*4);
+					
+					var texture = onMesh.material.map;
+
+					updateTexture(texture.image,tx,ty,a+0.1);
+					texture.needsUpdate = true;
+					
+				}
+
+				if (!starTaken) {
+					var distX = carx-star.position.x;
+					var distZ = carz-star.position.z;
+
+					var angleArrow = Math.atan2(distX, distZ) + Math.PI/2;
+					arrow.rotation.y = angleArrow;
+				}
+				arrow.position.set(carx,cary+300,carz);
+
+				star.rotation.y += 0.05;
+
+				if (carx < star.position.x+70 && carx > star.position.x-70 && !starTaken) {
+					if (carz < star.position.z+70 && carz > star.position.z-70) {
+						getStar();
+					}
+				}
+
+				// camera
+				camx += (carx+Math.sin(angle-Math.PI)*400 - camx)/Math.max(1, (15/optimalDivider) );
+				camz += (carz+Math.cos(angle-Math.PI)*400 - camz)/Math.max(1, (15/optimalDivider) );
+				camy += (cary+220 - camy)/Math.max(1, (10/optimalDivider) );
+
+				camera.position.set(camx,camy,camz);
+				camera.lookAt(car.position);
+
+				sky.position.x = carx;
+				sky.position.z = carz;
+
+				sun.position.set( camx, 2300, camz+9900);
+				sun.rotation = carx/3000;
+				var pulse = 12+Math.abs(Math.sin(time/3000));
+				sun.scale.set(pulse,pulse,pulse);
+
+				// light
+				light.position.set( car.position.x, car.position.y+300, car.position.z+200 );
+				light.target.position.set( car.position.x, car.position.y, car.position.z );
+				light.target.updateMatrixWorld();
+
+				// sound
+				if (sourceNode) {  
+					var s = Math.abs(speed/(maxspeed+2))
+					sourceNode.playbackRate.value = 0.8 + s + ((Math.random()/4) * Math.max(0.1, s));
+					gainNode.gain.value = 0.1 + Math.abs(speed/(maxspeed*10));
+					if (!soundOn) {
+						gainNode.gain.value = 0;
+					}
+				}
+			}
+
+			function onDocumentMousedown( event ) {
+				event.preventDefault();
+			}
+
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+		
+			}
+
+			function render() {
+
+				time = new Date().getTime();
+				delta = time - oldTime;
+				oldTime = time;
+
+
+				if (isNaN(delta) || delta > 1000 || delta == 0 ) {
+					delta = 1000/60;
+				}
+	
+				if (!gameOver) {
+					updateCounter();
+					control(delta);
+				}
+
+				uniforms.globalTime.value += delta * 0.002;
+				uniforms_dust.globalTime.value += delta * 0.003;
+
+				TWEEN.update();
+
+				if (has_gl) {
+					renderer.clear();
+					composer.render();
+				}
+
+			}
+
+		</script>
+	
+
+</font><div><canvas height="721" width="1536"></canvas></div></body></html>
